@@ -62,9 +62,13 @@ void NativeLayer::save_override() {
 }
 
 void NativeLayer::save_modified_layer(std::string path) {
-    GDALDriver *out_driver = (GDALDriver *)GDALGetDriverByName("ESRI Shapefile");
+    GDALDriver *out_driver = (GDALDriver *)GDALGetDriverByName("GPKG");
     GDALDataset *out_dataset = out_driver->Create(path.c_str(), 0, 0, 0, GDT_Unknown, nullptr);
-    OGRLayer *out_layer = out_dataset->CopyLayer(layer, layer->GetName());
+
+    auto options = CPLStringList();
+    options.AddString("GEOMETRY_NAME=geometry");
+
+    OGRLayer *out_layer = out_dataset->CopyLayer(layer, layer->GetName(), options);
 
     write_feature_cache_to_ram_layer();
 
@@ -81,12 +85,16 @@ void NativeLayer::save_modified_layer(std::string path) {
 
             OGRErr error;
 
+            auto id_before = feature->GetFID();
+
             // First try updating the feature, then create it if unsuccessful
             error = out_layer->SetFeature(feature);
 
             if (error > 0) {
                 error = out_layer->CreateFeature(feature);
             }
+
+            feature->SetFID(id_before);
 
             if (error > 0) std::cout << "Error saving feature: " << error << std::endl;
         }
